@@ -29,6 +29,11 @@ type S3Configuration struct {
 	CleanupAfterOperation bool
 }
 
+type ExtendedQueueMessage struct {
+	S3BucketName string
+	S3Key string
+}
+
 func (s3c *S3Configuration) isConfigured() bool {
 	return s3c.Client != nil && s3c.BucketName != ""
 }

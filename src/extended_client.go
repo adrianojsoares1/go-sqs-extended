@@ -8,11 +8,7 @@ func (esc *ExtendedSQS) SendMessage(input *sqs.SendMessageInput) (*sqs.SendMessa
 	if !esc.Configuration.S3Configuration.isConfigured() {
 		return esc.SQS.SendMessage(input)
 	}
-	if esc.Configuration.AlwaysSendThroughS3 {
-
-	}
-	if esc.messageIsLarge(input) {
-
+	if esc.Configuration.AlwaysSendThroughS3 || esc.messageIsLarge(input) {
 	}
 	return esc.SQS.SendMessage(input)
 }
@@ -21,10 +17,7 @@ func (esc *ExtendedSQS) SendMessageBatch(input *sqs.SendMessageBatchInput) (*sqs
 	if !esc.Configuration.S3Configuration.isConfigured() {
 		return esc.SQS.SendMessageBatch(input)
 	}
-	if esc.Configuration.AlwaysSendThroughS3 {
-
-	}
-	if esc.batchMessageIsLarge(input) {
+	if esc.Configuration.AlwaysSendThroughS3 || esc.batchMessageIsLarge(input) {
 
 	}
 	return esc.SQS.SendMessageBatch(input)

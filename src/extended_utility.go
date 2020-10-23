@@ -40,3 +40,7 @@ func (esc *ExtendedSQS) getMessageAttributesSize(attributes map[string]*sqs.Mess
 	wg.Wait()
 	return *sum
 }
+
+func (esc *ExtendedSQS) buildS3Message(message string) string {
+	return ""
+}
