@@ -8,30 +8,30 @@ import (
 
 func (esc *ExtendedSQS) messageIsLarge(message *sqs.SendMessageInput) bool {
 	return int64(len([]byte(*message.MessageBody))) + esc.getMessageAttributesSize(message.MessageAttributes) >
-		esc.cfg.LargeMessageThresholdKb
+		 esc.cfg.LargeMessageThreshold
 }
 
 func (esc *ExtendedSQS) batchMessageIsLarge(message *sqs.SendMessageBatchInput) bool {
 	sum := new(int64)
 	var wg sync.WaitGroup
 	for _, m := range message.Entries {
+		wg.Add(1)
 		go func(e *sqs.SendMessageBatchRequestEntry) {
-			wg.Add(1)
 			atomic.AddInt64(sum, int64(len([]byte(*e.MessageBody))))
 			atomic.AddInt64(sum, esc.getMessageAttributesSize(e.MessageAttributes))
 			wg.Done()
 		}(m)
 	}
 	wg.Wait()
-	return *sum > esc.cfg.LargeMessageThresholdKb
+	return *sum > esc.cfg.LargeMessageThreshold
 }
 
 func (esc *ExtendedSQS) getMessageAttributesSize(attributes map[string]*sqs.MessageAttributeValue) int64 {
 	sum := new(int64)
 	var wg sync.WaitGroup
 	for k, v := range attributes {
+		wg.Add(1)
 		go func(k string, attr *sqs.MessageAttributeValue) {
-			wg.Add(1)
 			atomic.AddInt64(sum, int64(len([]byte(k))))
 			atomic.AddInt64(sum, int64(len(attr.BinaryValue)))
 			wg.Done()
@@ -39,14 +39,4 @@ func (esc *ExtendedSQS) getMessageAttributesSize(attributes map[string]*sqs.Mess
 	}
 	wg.Wait()
 	return *sum
-}
-
-func (esc *ExtendedSQS) shallowCopySendMessageInput(input *sqs.SendMessageInput) *sqs.SendMessageInput {
-	duplicate := *input
-	return &duplicate
-}
-
-func (esc *ExtendedSQS) shallowCopySendMessageBatchInput(input *sqs.SendMessageBatchInput) *sqs.SendMessageBatchInput {
-	duplicate := *input
-	return &duplicate
 }

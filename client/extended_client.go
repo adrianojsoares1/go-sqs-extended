@@ -7,7 +7,10 @@ import (
 	"github.com/aws/aws-sdk-go/service/sqs"
 )
 
-// SendMessage
+// SendMessage creates and inserts a record into the given SQS queue
+// If large message processing is enabled, the contents of the message are inserted to S3 as a new object.
+// Then, a reference to the object will be sent as the SQS record instead.
+// If large message processing is disabled, the contents of the message are sent to SQS as normal.
 func (esc *ExtendedSQS) SendMessage(input *sqs.SendMessageInput) (*sqs.SendMessageOutput, error) {
 	if !esc.s3c.Configured {
 		return esc.SQS.SendMessage(input)
@@ -27,9 +30,10 @@ func (esc *ExtendedSQS) SendMessage(input *sqs.SendMessageInput) (*sqs.SendMessa
 	if err != nil {
 		return &sqs.SendMessageOutput{}, fmt.Errorf("couldn't parse SendMessageInput message, %v", err)
 	}
-	modified := esc.shallowCopySendMessageInput(input)
-	modified.MessageBody = aws.String(string(asBytes))
-	return esc.SQS.SendMessage(modified)
+	// shallow copy to avoid side effects (modifying input object)
+	duplicate := *input
+	duplicate.MessageBody = aws.String(string(asBytes))
+	return esc.SQS.SendMessage(&duplicate)
 }
 
 func (esc *ExtendedSQS) SendMessageBatch(input *sqs.SendMessageBatchInput) (*sqs.SendMessageBatchOutput, error) {

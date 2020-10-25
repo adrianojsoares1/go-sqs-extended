@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	DefaultLargeMessageSize int64 = 256 // kb
+	DefaultLargeMessageSize int64 = 262144 // bytes
 )
 
 type ExtendedSQS struct {
@@ -19,22 +19,22 @@ type ExtendedSQS struct {
 }
 
 type ExtendedConfiguration struct {
-	AlwaysSendThroughS3 bool
-	LargeMessageThresholdKb int64
+	AlwaysSendThroughS3            bool
+	LargeMessageThreshold          int64
 	UseLegacyReservedAttributeName bool
-	S3Configuration *S3Configuration
+	S3Configuration                *S3Configuration
 }
 
 type extendedConfigurationGhost struct {
-	AlwaysSendThroughS3 bool
-	LargeMessageThresholdKb int64
+	AlwaysSendThroughS3            bool
+	LargeMessageThreshold          int64
 	UseLegacyReservedAttributeName bool
 }
 
 func (ec *ExtendedConfiguration) toGhost() *extendedConfigurationGhost {
 	return &extendedConfigurationGhost{
 		AlwaysSendThroughS3:            ec.AlwaysSendThroughS3,
-		LargeMessageThresholdKb:        ec.LargeMessageThresholdKb,
+		LargeMessageThreshold:          ec.LargeMessageThreshold,
 		UseLegacyReservedAttributeName: ec.UseLegacyReservedAttributeName,
 	}
 }
@@ -79,9 +79,9 @@ func NewExtended(sqs *sqs.SQS, options *ExtendedConfiguration) (*ExtendedSQS, er
 	if options == nil {
 		options = &ExtendedConfiguration{S3Configuration: &S3Configuration{}}
 	}
-	if options.LargeMessageThresholdKb < 1 {
+	if options.LargeMessageThreshold < 1 {
 		log.Printf("defaulting to %dkb as large message threshold", DefaultLargeMessageSize)
-		options.LargeMessageThresholdKb = DefaultLargeMessageSize
+		options.LargeMessageThreshold = DefaultLargeMessageSize
 	}
 	return &ExtendedSQS{
 		SQS: sqs,
