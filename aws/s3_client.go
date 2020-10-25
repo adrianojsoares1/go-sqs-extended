@@ -5,7 +5,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/google/uuid"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"strings"
 )
 
@@ -33,6 +33,8 @@ func (s3c *s3Client) WriteBigMessage(message string) (string, error) {
 		Key: aws.String(objectNameAsString),
 		Body: strings.NewReader(message),
 	})
-	log.Printf("finished uploading object %s to bucket %s", objectNameAsString, s3c.Bucket)
+	if err == nil {
+		log.Debugf("finished uploading object %s to bucket %s", objectNameAsString, s3c.Bucket)
+	}
 	return objectNameAsString, err
 }

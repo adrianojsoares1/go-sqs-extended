@@ -5,7 +5,7 @@ import (
 	bma "github.com/asoares1-chwy/go-sqs-extended/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/sqs"
-	"log"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -59,15 +59,18 @@ type s3ConfigurationGhost struct {
 func (s3c *S3Configuration) toGhost() *s3ConfigurationGhost {
 	ghost := &s3ConfigurationGhost{}
 	if s3c.isConfigured() {
+		log.Debug("running with configured s3 client, messages may be sent through S3 object references")
 		ghost.Configured = true
 		ghost.BucketName = s3c.BucketName
 		ghost.Client = bma.NewS3Client(s3c.Client, s3c.BucketName)
 		ghost.CleanupAfterOperation = s3c.CleanupAfterOperation
+	} else {
+		log.Debug("running with unconfigured s3 client, messages can only be sent 'as is'")
 	}
 	return ghost
 }
 
-type ExtendedQueueMessage struct {
+type extendedQueueMessage struct {
 	S3BucketName string
 	S3Key        string
 }
@@ -80,7 +83,7 @@ func NewExtended(sqs *sqs.SQS, options *ExtendedConfiguration) (*ExtendedSQS, er
 		options = &ExtendedConfiguration{S3Configuration: &S3Configuration{}}
 	}
 	if options.LargeMessageThreshold < 1 {
-		log.Printf("defaulting to %dkb as large message threshold", DefaultLargeMessageSize)
+		log.Debugf("running with default value %d as large message threshold", DefaultLargeMessageSize)
 		options.LargeMessageThreshold = DefaultLargeMessageSize
 	}
 	return &ExtendedSQS{

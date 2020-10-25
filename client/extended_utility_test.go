@@ -72,11 +72,12 @@ func TestExtendedSQS_messageIsLarge(t *testing.T) {
 func TestExtendedSQS_batchMessageIsLarge(t *testing.T) {
 	cases := []struct {
 		Name string
-		Input *sqs.SendMessageInput
-		ExpectedSize int64
+		ThresholdKb int64
+		Input *sqs.SendMessageBatchInput
+		ExpectedLarge bool
 	}{
 		{
-
+			Name: "Batch Message Is Large",
 		},
 	}
 	for _, tc := range cases {

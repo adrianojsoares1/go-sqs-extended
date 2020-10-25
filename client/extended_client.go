@@ -21,9 +21,9 @@ func (esc *ExtendedSQS) SendMessage(input *sqs.SendMessageInput) (*sqs.SendMessa
 	id, err := esc.s3c.Client.WriteBigMessage(*input.MessageBody)
 	if err != nil {
 		return &sqs.SendMessageOutput{},
-			fmt.Errorf("message could not be uploaded to S3, reason: %v. nothing was sent to SQS", err)
+			fmt.Errorf("message could not be uploaded to S3, nothing was sent to SQS. %v", err)
 	}
-	asBytes, err := json.Marshal(&ExtendedQueueMessage{
+	asBytes, err := json.Marshal(&extendedQueueMessage{
 		S3BucketName: esc.s3c.BucketName,
 		S3Key:        id,
 	})
