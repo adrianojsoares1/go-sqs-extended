@@ -8,7 +8,7 @@ import (
 
 func (esc *ExtendedSQS) messageIsLarge(message *sqs.SendMessageInput) bool {
 	return int64(len([]byte(*message.MessageBody))) + esc.getMessageAttributesSize(message.MessageAttributes) >
-		esc.Configuration.LargeMessageThresholdKb
+		esc.cfg.LargeMessageThresholdKb
 }
 
 func (esc *ExtendedSQS) batchMessageIsLarge(message *sqs.SendMessageBatchInput) bool {
@@ -23,7 +23,7 @@ func (esc *ExtendedSQS) batchMessageIsLarge(message *sqs.SendMessageBatchInput) 
 		}(m)
 	}
 	wg.Wait()
-	return *sum > esc.Configuration.LargeMessageThresholdKb
+	return *sum > esc.cfg.LargeMessageThresholdKb
 }
 
 func (esc *ExtendedSQS) getMessageAttributesSize(attributes map[string]*sqs.MessageAttributeValue) int64 {
@@ -41,6 +41,12 @@ func (esc *ExtendedSQS) getMessageAttributesSize(attributes map[string]*sqs.Mess
 	return *sum
 }
 
-func (esc *ExtendedSQS) buildS3Message(message string) string {
-	return ""
+func (esc *ExtendedSQS) shallowCopySendMessageInput(input *sqs.SendMessageInput) *sqs.SendMessageInput {
+	duplicate := *input
+	return &duplicate
+}
+
+func (esc *ExtendedSQS) shallowCopySendMessageBatchInput(input *sqs.SendMessageBatchInput) *sqs.SendMessageBatchInput {
+	duplicate := *input
+	return &duplicate
 }
