@@ -1,10 +1,12 @@
 package go_sqs_extended
 
 import (
+	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/sqs"
+	"github.com/hashicorp/go-multierror"
 )
 
 // SendMessage creates and inserts a record into the given SQS queue
@@ -48,7 +50,25 @@ func (esc *ExtendedSQS) SendMessageBatch(input *sqs.SendMessageBatchInput) (*sqs
 }
 
 func (esc *ExtendedSQS) ReceiveMessage(input *sqs.ReceiveMessageInput) (*sqs.ReceiveMessageOutput, error) {
-	return nil, nil
+	if !esc.s3c.Configured {
+		return esc.SQS.ReceiveMessage(input)
+	}
+	result, err := esc.SQS.ReceiveMessage(input)
+	if err != nil {
+		return result, err
+	}
+	var merr = new(multierror.Error)
+	for _, message := range result.Messages {
+		contents, err := esc.s3c.Client.ExtractBigMessage(*message.Body)
+		if err != nil {
+			merr = multierror.Append(merr,
+				fmt.Errorf("failed to extract message %s from s3: %w", *message.MessageId, err))
+		}
+		hashed := md5.Sum([]byte(contents))
+		message.Body = aws.String(contents)
+		message.MD5OfBody = aws.String(fmt.Sprintf("%x", hashed))
+	}
+	return result, merr.ErrorOrNil()
 }
 
 func (esc *ExtendedSQS) DeleteMessage(input *sqs.DeleteMessageInput) (*sqs.DeleteMessageOutput, error) {
