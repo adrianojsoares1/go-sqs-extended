@@ -62,7 +62,7 @@ func (esc *ExtendedSQS) ReceiveMessage(input *sqs.ReceiveMessageInput) (*sqs.Rec
 		contents, err := esc.s3c.Client.ExtractBigMessage(*message.Body)
 		if err != nil {
 			merr = multierror.Append(merr,
-				fmt.Errorf("failed to extract message %s from s3: %w", *message.MessageId, err))
+				fmt.Errorf("failed to extract message %s from s3, result not modifed: %w", *message.MessageId, err))
 		} else {
 			hashed := md5.Sum([]byte(contents))
 			message.Body = aws.String(contents)
