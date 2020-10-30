@@ -63,10 +63,11 @@ func (esc *ExtendedSQS) ReceiveMessage(input *sqs.ReceiveMessageInput) (*sqs.Rec
 		if err != nil {
 			merr = multierror.Append(merr,
 				fmt.Errorf("failed to extract message %s from s3: %w", *message.MessageId, err))
+		} else {
+			hashed := md5.Sum([]byte(contents))
+			message.Body = aws.String(contents)
+			message.MD5OfBody = aws.String(fmt.Sprintf("%x", hashed))
 		}
-		hashed := md5.Sum([]byte(contents))
-		message.Body = aws.String(contents)
-		message.MD5OfBody = aws.String(fmt.Sprintf("%x", hashed))
 	}
 	return result, merr.ErrorOrNil()
 }
