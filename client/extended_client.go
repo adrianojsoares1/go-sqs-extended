@@ -57,19 +57,27 @@ func (esc *ExtendedSQS) ReceiveMessage(input *sqs.ReceiveMessageInput) (*sqs.Rec
 	if err != nil {
 		return result, err
 	}
-	var merr = new(multierror.Error)
 	for _, message := range result.Messages {
-		contents, err := esc.s3c.Client.ExtractBigMessage(*message.Body)
-		if err != nil {
-			merr = multierror.Append(merr,
-				fmt.Errorf("failed to extract message %s from s3, result not modifed: %w", *message.MessageId, err))
-		} else {
-			hashed := md5.Sum([]byte(contents))
-			message.Body = aws.String(contents)
-			message.MD5OfBody = aws.String(fmt.Sprintf("%x", hashed))
-		}
+		err = multierror.Append(err, esc.modifyRecievedSQSMessage(message))
 	}
-	return result, merr.ErrorOrNil()
+	return result, err.(*multierror.Error).ErrorOrNil()
+}
+
+func (esc *ExtendedSQS) modifyRecievedSQSMessage(message *sqs.Message) error {
+	var extendedBody = new(extendedQueueMessage)
+	err := json.Unmarshal([]byte(*message.Body), extendedBody)
+	if err != nil {
+		return fmt.Errorf("couldn't extract message body: %w", err)
+	}
+	contents, err := esc.s3c.Client.ExtractBigMessage(extendedBody.S3Key)
+	if err != nil {
+		return fmt.Errorf("failed to extract message %s from s3, result not modifed: %w",
+			*message.MessageId, err)
+	}
+	hashed := md5.Sum([]byte(contents))
+	message.Body = aws.String(contents)
+	message.MD5OfBody = aws.String(fmt.Sprintf("%x", hashed))
+	return err
 }
 
 func (esc *ExtendedSQS) DeleteMessage(input *sqs.DeleteMessageInput) (*sqs.DeleteMessageOutput, error) {

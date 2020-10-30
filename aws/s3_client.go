@@ -47,7 +47,7 @@ func (s3c *s3Client) ExtractBigMessage(key string) (string, error) {
 		Key:                        aws.String(key),
 	})
 	var body = new(string)
-	if err != nil || output.Body != nil {
+	if err != nil || output.Body == nil {
 		return *body, err
 	}
 	sb := new(strings.Builder)
