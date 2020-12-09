@@ -23,14 +23,14 @@ func (esc *ExtendedSQS) SendMessage(input *sqs.SendMessageInput) (*sqs.SendMessa
 	id, err := esc.s3c.Client.WriteBigMessage(*input.MessageBody)
 	if err != nil {
 		return &sqs.SendMessageOutput{},
-			fmt.Errorf("message could not be uploaded to S3, nothing was sent to SQS. %v", err)
+			fmt.Errorf("message could not be uploaded to S3, nothing was sent to SQS: %w", err)
 	}
 	asBytes, err := json.Marshal(&extendedQueueMessage{
 		S3BucketName: esc.s3c.BucketName,
 		S3Key:        id,
 	})
 	if err != nil {
-		return &sqs.SendMessageOutput{}, fmt.Errorf("couldn't parse SendMessageInput message, %v", err)
+		return &sqs.SendMessageOutput{}, fmt.Errorf("couldn't parse SendMessageInput message: %w", err)
 	}
 	// shallow copy to avoid side effects (modifying input object)
 	duplicate := *input
@@ -57,27 +57,39 @@ func (esc *ExtendedSQS) ReceiveMessage(input *sqs.ReceiveMessageInput) (*sqs.Rec
 	if err != nil {
 		return result, err
 	}
-	for _, message := range result.Messages {
-		err = multierror.Append(err, esc.modifyRecievedSQSMessage(message))
+	var merr error
+	extracted := make([]*sqs.Message, len(result.Messages))
+	for i, message := range result.Messages {
+		m, err := esc.createExtractedMessage(message)
+		if err != nil {
+			merr = multierror.Append(merr, err)
+		}
+		extracted[i] = m
 	}
-	return result, err.(*multierror.Error).ErrorOrNil()
+	return &sqs.ReceiveMessageOutput{Messages: extracted}, merr
 }
 
-func (esc *ExtendedSQS) modifyRecievedSQSMessage(message *sqs.Message) error {
+func (esc *ExtendedSQS) createExtractedMessage(message *sqs.Message) (*sqs.Message, error) {
 	var extendedBody = new(extendedQueueMessage)
 	err := json.Unmarshal([]byte(*message.Body), extendedBody)
 	if err != nil {
-		return fmt.Errorf("couldn't extract message body: %w", err)
+		return message, fmt.Errorf("couldn't extract message body: %w", err)
 	}
 	contents, err := esc.s3c.Client.ExtractBigMessage(extendedBody.S3Key)
 	if err != nil {
-		return fmt.Errorf("failed to extract message %s from s3, result not modifed: %w",
+		return message, fmt.Errorf("failed to extract message %s from s3, result not modified: %w",
 			*message.MessageId, err)
 	}
 	hashed := md5.Sum([]byte(contents))
-	message.Body = aws.String(contents)
-	message.MD5OfBody = aws.String(fmt.Sprintf("%x", hashed))
-	return err
+	return &sqs.Message{
+		Attributes:             message.Attributes,
+		Body:                   aws.String(contents),
+		MD5OfBody:              aws.String(fmt.Sprintf("%x", hashed)),
+		MD5OfMessageAttributes: message.MD5OfMessageAttributes,
+		MessageAttributes:      message.MessageAttributes,
+		MessageId:              message.MessageId,
+		ReceiptHandle:          message.ReceiptHandle,
+	}, err
 }
 
 func (esc *ExtendedSQS) DeleteMessage(input *sqs.DeleteMessageInput) (*sqs.DeleteMessageOutput, error) {
