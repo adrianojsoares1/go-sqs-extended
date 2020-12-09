@@ -50,11 +50,11 @@ func (esc *ExtendedSQS) SendMessageBatch(input *sqs.SendMessageBatchInput) (*sqs
 }
 
 func (esc *ExtendedSQS) ReceiveMessage(input *sqs.ReceiveMessageInput) (*sqs.ReceiveMessageOutput, error) {
-	if !esc.s3c.Configured {
-		return esc.SQS.ReceiveMessage(input)
-	}
 	result, err := esc.SQS.ReceiveMessage(input)
 	if err != nil {
+		return result, err
+	}
+	if !esc.s3c.Configured {
 		return result, err
 	}
 	var merr error
