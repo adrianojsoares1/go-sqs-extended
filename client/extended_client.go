@@ -93,17 +93,29 @@ func (esc *ExtendedSQS) createExtractedMessage(message *sqs.Message) (*sqs.Messa
 }
 
 func (esc *ExtendedSQS) DeleteMessage(input *sqs.DeleteMessageInput) (*sqs.DeleteMessageOutput, error) {
+	if !esc.s3c.Configured {
+		return esc.SQS.DeleteMessage(input)
+	}
 	return nil, nil
 }
 
 func (esc *ExtendedSQS) DeleteMessageBatch(input *sqs.DeleteMessageBatchInput) (*sqs.DeleteMessageBatchOutput, error) {
+	if !esc.s3c.Configured {
+		return esc.SQS.DeleteMessageBatch(input)
+	}
 	return nil, nil
 }
 
 func (esc *ExtendedSQS) ChangeMessageVisibility(input *sqs.ChangeMessageVisibilityInput) (*sqs.ChangeMessageVisibilityOutput, error) {
+	if !esc.s3c.Configured {
+		return esc.SQS.ChangeMessageVisibility(input)
+	}
 	return nil, nil
 }
 
 func (esc *ExtendedSQS) ChangeMessageVisibilityBatch(input *sqs.ChangeMessageVisibilityBatchInput) (*sqs.ChangeMessageVisibilityBatchOutput, error) {
+	if !esc.s3c.Configured {
+		return esc.SQS.ChangeMessageVisibilityBatch(input)
+	}
 	return nil, nil
 }

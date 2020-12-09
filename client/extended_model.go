@@ -10,6 +10,9 @@ import (
 
 const (
 	DefaultLargeMessageSize int64 = 262144 // bytes
+	ReservedAttributeName = "ExtendedPayloadSize"
+	LegacyReservedAttributeName = "SQSLargePayloadSize"
+	MaximumAllowedAttributes = 9 // 10 - 1 for reserved
 )
 
 type ExtendedSQS struct {
