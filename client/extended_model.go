@@ -2,18 +2,39 @@ package go_sqs_extended
 
 import (
 	"errors"
+	"fmt"
+	"regexp"
+
 	bma "github.com/asoares1-chwy/go-sqs-extended/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	log "github.com/sirupsen/logrus"
 )
 
+type ReservedAttribute string
+
 const (
-	DefaultLargeMessageSize int64 = 262144 // bytes
-	ReservedAttributeName = "ExtendedPayloadSize"
-	LegacyReservedAttributeName = "SQSLargePayloadSize"
-	MaximumAllowedAttributes = 9 // 10 - 1 for reserved
+	DefaultLargeMessageSize  int64 = 262144 // bytes
+	MaximumAllowedAttributes       = 9      // 10 - 1 for reserved
+	S3BucketNameMarker             = "-..s3BucketName..-"
+	S3KeyMarker                    = "-..s3Key..-"
+
+	AttributeName       ReservedAttribute = "ExtendedPayloadSize"
+	LegacyAttributeName ReservedAttribute = "SQSLargePayloadSize"
 )
+
+func (r ReservedAttribute) isReservedAttribute() bool {
+	switch r {
+	case AttributeName, LegacyAttributeName:
+		return true
+	}
+	return false
+}
+
+var ReceiptHandleRegexp = regexp.MustCompile(fmt.Sprintf(
+	"^(%s)(.*)(%s)(.*)(%s)(.*)(%s){1}",
+	S3BucketNameMarker, S3BucketNameMarker, S3KeyMarker, S3KeyMarker,
+))
 
 type ExtendedSQS struct {
 	*sqs.SQS
@@ -43,8 +64,8 @@ func (ec *ExtendedConfiguration) toGhost() *extendedConfigurationGhost {
 }
 
 type S3Configuration struct {
-	Client *s3.S3
-	BucketName string
+	Client                *s3.S3
+	BucketName            string
 	CleanupAfterOperation bool
 }
 
@@ -53,9 +74,9 @@ func (s3c *S3Configuration) isConfigured() bool {
 }
 
 type s3ConfigurationGhost struct {
-	Configured bool
-	Client bma.BigMessageS3Client
-	BucketName string
+	Configured            bool
+	Client                bma.BigMessageS3Client
+	BucketName            string
 	CleanupAfterOperation bool
 }
 

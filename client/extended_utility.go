@@ -1,14 +1,15 @@
 package go_sqs_extended
 
 import (
-	"github.com/aws/aws-sdk-go/service/sqs"
 	"sync"
 	"sync/atomic"
+
+	"github.com/aws/aws-sdk-go/service/sqs"
 )
 
 func (esc *ExtendedSQS) messageIsLarge(message *sqs.SendMessageInput) bool {
-	return int64(len([]byte(*message.MessageBody))) + esc.getMessageAttributesSize(message.MessageAttributes) >
-		 esc.cfg.LargeMessageThreshold
+	return int64(len([]byte(*message.MessageBody)))+esc.getMessageAttributesSize(message.MessageAttributes) >
+		esc.cfg.LargeMessageThreshold
 }
 
 func (esc *ExtendedSQS) batchMessageIsLarge(message *sqs.SendMessageBatchInput) bool {
@@ -39,4 +40,36 @@ func (esc *ExtendedSQS) getMessageAttributesSize(attributes map[string]*sqs.Mess
 	}
 	wg.Wait()
 	return *sum
+}
+
+func (esc *ExtendedSQS) embedS3PointerInReceiptHandle(receiptHandle string, message *extendedQueueMessage) string {
+	return S3BucketNameMarker + message.S3BucketName + S3BucketNameMarker +
+		S3KeyMarker + message.S3Key + S3KeyMarker + receiptHandle
+}
+
+func (esc *ExtendedSQS) removeS3PointerFromReceiptHandle(receiptHandle string) string {
+	index := ReceiptHandleRegexp.FindIndex([]byte(receiptHandle))
+	if index == nil {
+		return receiptHandle
+	}
+	return receiptHandle[index[1]:]
+}
+
+func (esc *ExtendedSQS) isS3PointerReceiptHandle(receiptHandle string) bool {
+	return ReceiptHandleRegexp.Match([]byte(receiptHandle))
+}
+
+func (esc *ExtendedSQS) enforceSingleReserved(attrs []*string) []*string {
+	var seen map[string]bool
+	var attributes []*string
+	for _, attr := range attrs {
+		res := *attr
+		if !ReservedAttribute(res).isReservedAttribute() {
+			if seen[res] == false {
+				attributes = append(attributes, &res)
+				seen[res] = true
+			}
+		}
+	}
+	return attributes
 }

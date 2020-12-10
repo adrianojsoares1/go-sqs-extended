@@ -4,6 +4,7 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/hashicorp/go-multierror"
@@ -50,22 +51,24 @@ func (esc *ExtendedSQS) SendMessageBatch(input *sqs.SendMessageBatchInput) (*sqs
 }
 
 func (esc *ExtendedSQS) ReceiveMessage(input *sqs.ReceiveMessageInput) (*sqs.ReceiveMessageOutput, error) {
-	result, err := esc.SQS.ReceiveMessage(input)
-	if err != nil {
+	extendedInput := *input
+	extendedInput.AttributeNames = esc.enforceSingleReserved(input.AttributeNames)
+	result, err := esc.SQS.ReceiveMessage(&extendedInput)
+
+	if !esc.s3c.Configured || err != nil {
 		return result, err
 	}
-	if !esc.s3c.Configured {
-		return result, err
-	}
+
 	var merr error
 	extracted := make([]*sqs.Message, len(result.Messages))
 	for i, message := range result.Messages {
-		m, err := esc.createExtractedMessage(message)
-		if err != nil {
+		if m, err := esc.createExtractedMessage(message); err != nil {
 			merr = multierror.Append(merr, err)
+		} else {
+			extracted[i] = m
 		}
-		extracted[i] = m
 	}
+
 	return &sqs.ReceiveMessageOutput{Messages: extracted}, merr
 }
 
@@ -81,6 +84,9 @@ func (esc *ExtendedSQS) createExtractedMessage(message *sqs.Message) (*sqs.Messa
 			*message.MessageId, err)
 	}
 	hashed := md5.Sum([]byte(contents))
+	handle := esc.embedS3PointerInReceiptHandle(
+		aws.StringValue(message.ReceiptHandle), extendedBody,
+	)
 	return &sqs.Message{
 		Attributes:             message.Attributes,
 		Body:                   aws.String(contents),
@@ -88,7 +94,7 @@ func (esc *ExtendedSQS) createExtractedMessage(message *sqs.Message) (*sqs.Messa
 		MD5OfMessageAttributes: message.MD5OfMessageAttributes,
 		MessageAttributes:      message.MessageAttributes,
 		MessageId:              message.MessageId,
-		ReceiptHandle:          message.ReceiptHandle,
+		ReceiptHandle:          aws.String(handle),
 	}, err
 }
 
