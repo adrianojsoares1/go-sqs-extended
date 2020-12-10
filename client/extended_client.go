@@ -1,10 +1,13 @@
 package go_sqs_extended
 
 import (
+	"crypto/md5"
 	"encoding/json"
 	"fmt"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/sqs"
+	"github.com/hashicorp/go-multierror"
 )
 
 // SendMessage creates and inserts a record into the given SQS queue
@@ -21,14 +24,14 @@ func (esc *ExtendedSQS) SendMessage(input *sqs.SendMessageInput) (*sqs.SendMessa
 	id, err := esc.s3c.Client.WriteBigMessage(*input.MessageBody)
 	if err != nil {
 		return &sqs.SendMessageOutput{},
-			fmt.Errorf("message could not be uploaded to S3, nothing was sent to SQS. %v", err)
+			fmt.Errorf("message could not be uploaded to S3, nothing was sent to SQS: %w", err)
 	}
 	asBytes, err := json.Marshal(&extendedQueueMessage{
 		S3BucketName: esc.s3c.BucketName,
 		S3Key:        id,
 	})
 	if err != nil {
-		return &sqs.SendMessageOutput{}, fmt.Errorf("couldn't parse SendMessageInput message, %v", err)
+		return &sqs.SendMessageOutput{}, fmt.Errorf("couldn't parse SendMessageInput message: %w", err)
 	}
 	// shallow copy to avoid side effects (modifying input object)
 	duplicate := *input
@@ -48,21 +51,77 @@ func (esc *ExtendedSQS) SendMessageBatch(input *sqs.SendMessageBatchInput) (*sqs
 }
 
 func (esc *ExtendedSQS) ReceiveMessage(input *sqs.ReceiveMessageInput) (*sqs.ReceiveMessageOutput, error) {
-	return nil, nil
+	extendedInput := *input
+	extendedInput.AttributeNames = esc.enforceSingleReserved(input.AttributeNames)
+	result, err := esc.SQS.ReceiveMessage(&extendedInput)
+
+	if !esc.s3c.Configured || err != nil {
+		return result, err
+	}
+
+	var merr error
+	extracted := make([]*sqs.Message, len(result.Messages))
+	for i, message := range result.Messages {
+		if m, err := esc.createExtractedMessage(message); err != nil {
+			merr = multierror.Append(merr, err)
+		} else {
+			extracted[i] = m
+		}
+	}
+
+	return &sqs.ReceiveMessageOutput{Messages: extracted}, merr
+}
+
+func (esc *ExtendedSQS) createExtractedMessage(message *sqs.Message) (*sqs.Message, error) {
+	var extendedBody = new(extendedQueueMessage)
+	err := json.Unmarshal([]byte(*message.Body), extendedBody)
+	if err != nil {
+		return message, fmt.Errorf("couldn't extract message body: %w", err)
+	}
+	contents, err := esc.s3c.Client.ExtractBigMessage(extendedBody.S3Key)
+	if err != nil {
+		return message, fmt.Errorf("failed to extract message %s from s3, result not modified: %w",
+			*message.MessageId, err)
+	}
+	hashed := md5.Sum([]byte(contents))
+	handle := esc.embedS3PointerInReceiptHandle(
+		aws.StringValue(message.ReceiptHandle), extendedBody,
+	)
+	return &sqs.Message{
+		Attributes:             message.Attributes,
+		Body:                   aws.String(contents),
+		MD5OfBody:              aws.String(fmt.Sprintf("%x", hashed)),
+		MD5OfMessageAttributes: message.MD5OfMessageAttributes,
+		MessageAttributes:      message.MessageAttributes,
+		MessageId:              message.MessageId,
+		ReceiptHandle:          aws.String(handle),
+	}, err
 }
 
 func (esc *ExtendedSQS) DeleteMessage(input *sqs.DeleteMessageInput) (*sqs.DeleteMessageOutput, error) {
+	if !esc.s3c.Configured {
+		return esc.SQS.DeleteMessage(input)
+	}
 	return nil, nil
 }
 
 func (esc *ExtendedSQS) DeleteMessageBatch(input *sqs.DeleteMessageBatchInput) (*sqs.DeleteMessageBatchOutput, error) {
+	if !esc.s3c.Configured {
+		return esc.SQS.DeleteMessageBatch(input)
+	}
 	return nil, nil
 }
 
 func (esc *ExtendedSQS) ChangeMessageVisibility(input *sqs.ChangeMessageVisibilityInput) (*sqs.ChangeMessageVisibilityOutput, error) {
+	if !esc.s3c.Configured {
+		return esc.SQS.ChangeMessageVisibility(input)
+	}
 	return nil, nil
 }
 
 func (esc *ExtendedSQS) ChangeMessageVisibilityBatch(input *sqs.ChangeMessageVisibilityBatchInput) (*sqs.ChangeMessageVisibilityBatchOutput, error) {
+	if !esc.s3c.Configured {
+		return esc.SQS.ChangeMessageVisibilityBatch(input)
+	}
 	return nil, nil
 }
