@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"regexp"
 
-	bma "github.com/asoares1-chwy/go-sqs-extended/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	log "github.com/sirupsen/logrus"
@@ -75,7 +74,7 @@ func (s3c *S3Configuration) isConfigured() bool {
 
 type s3ConfigurationGhost struct {
 	Configured            bool
-	Client                bma.BigMessageS3Client
+	Client                BigMessageS3Client
 	BucketName            string
 	CleanupAfterOperation bool
 }
@@ -86,7 +85,7 @@ func (s3c *S3Configuration) toGhost() *s3ConfigurationGhost {
 		log.Debug("running with configured s3 client, messages may be sent through S3 object references")
 		ghost.Configured = true
 		ghost.BucketName = s3c.BucketName
-		ghost.Client = bma.NewS3Client(s3c.Client, s3c.BucketName)
+		ghost.Client = NewS3Client(s3c.Client, s3c.BucketName)
 		ghost.CleanupAfterOperation = s3c.CleanupAfterOperation
 	} else {
 		log.Debug("running with unconfigured s3 client, messages can only be sent 'as is'")

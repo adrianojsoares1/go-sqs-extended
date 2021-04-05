@@ -21,15 +21,12 @@ func (esc *ExtendedSQS) SendMessage(input *sqs.SendMessageInput) (*sqs.SendMessa
 	if !esc.cfg.AlwaysSendThroughS3 && !esc.messageIsLarge(input) {
 		return esc.SQS.SendMessage(input)
 	}
-	id, err := esc.s3c.Client.WriteBigMessage(*input.MessageBody)
+	asMessage, err := esc.s3c.Client.CreateBigMessage(input.MessageBody)
 	if err != nil {
 		return &sqs.SendMessageOutput{},
 			fmt.Errorf("message could not be uploaded to S3, nothing was sent to SQS: %w", err)
 	}
-	asBytes, err := json.Marshal(&extendedQueueMessage{
-		S3BucketName: esc.s3c.BucketName,
-		S3Key:        id,
-	})
+	asBytes, err := json.Marshal(&asMessage)
 	if err != nil {
 		return &sqs.SendMessageOutput{}, fmt.Errorf("couldn't parse SendMessageInput message: %w", err)
 	}
@@ -78,7 +75,7 @@ func (esc *ExtendedSQS) createExtractedMessage(message *sqs.Message) (*sqs.Messa
 	if err != nil {
 		return message, fmt.Errorf("couldn't extract message body: %w", err)
 	}
-	contents, err := esc.s3c.Client.ExtractBigMessage(extendedBody.S3Key)
+	contents, err := esc.s3c.Client.ExtractBigMessage(extendedBody)
 	if err != nil {
 		return message, fmt.Errorf("failed to extract message %s from s3, result not modified: %w",
 			*message.MessageId, err)
