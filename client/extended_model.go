@@ -7,6 +7,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/sqs"
+	"github.com/aws/aws-sdk-go/service/sqs/sqsiface"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -36,7 +37,7 @@ var ReceiptHandleRegexp = regexp.MustCompile(fmt.Sprintf(
 ))
 
 type ExtendedSQS struct {
-	*sqs.SQS
+	SQS sqsiface.SQSAPI
 	cfg *extendedConfigurationGhost
 	s3c *s3ConfigurationGhost
 }
